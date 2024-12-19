@@ -1,0 +1,197 @@
+/**************************************************************
+ *
+ *                     README
+ *
+ *     Assignment: HW 3: locality
+ *        Authors: Dan Glorioso & Brandon Dionisio (dglori02 & bdioni01)
+ *           Date: 02/22/24
+ *
+ **************************************************************/
+
+Who we collaborated with:
+    
+    We did not collaborate with anyone on this assignment.
+
+What we implemented correctly:
+    
+    We fully implemented UArray2b, a2plain.c and the ppmtrans program (which 
+    depends on our transformations driver program that we created, as well).
+
+Architecture of our solutions:
+
+    For the architecture of our solution, we employed three levels of data
+    structures that enable the storing and transformation of our images.
+
+    UArray2
+    We utilized a UArray2 data structure to store the row-major and
+    column-major reads of the image. This data structure is comprised of a
+    single UArray in which each element itself holds a separate UArray.
+    Together, we can create a 2D array in which the dimensions are the length
+    of the first UArray x the dimensions of the second UArray2s.
+
+    UArray2b
+    We utilized the UArray2b architecture to store the block-major reading of 
+    the input image. This data structure is comprised of a UArray2 with each 
+    element of the UArray2 being a block, which each is comprised of a single, 
+    one-dimensional UArray_T. This representation guarantees that the cells in 
+    the same block are in nearby memory locations.
+    
+    A2Methods
+    We utilized the A2Methods struct interface to create a polymorphic design 
+    in which both UArray2s and UArray2bs can be used in conjunction with all of
+    our transformation functions to call the appropriate functions based on how
+    the data is stored in arrays. The A2Methods_T object is a struct containing
+    a series of functions that work with both forms of A2 arrays (UArray2 and 
+    UArray2b). Both method suites, A2plain (which implements UArray2 arrays)
+    and A2blocked (which implements UArray2b arrays), contain an exported
+    pointer to the struct of A2Method_T functions for that particular A2 array
+    architecture. These two method suites contain the same functions, but 
+    interact with their respective data structures differently to achieve the 
+    same intended result. Some of these functions include new, a2free, width, 
+    height, at, map_default, etc. Most importantly, the A2Methods_T struct 
+    contains an instance of an A2Methods_UArray2 new function that is 
+    responsible for the creation of either the UArray2 or UArray2b objects. 
+    The A2Methods interface sets its member functions to those of its 
+    corresponding object type – a UArray2 type will obtain its functions from 
+    a2plain.c and a UArray2b type will obtain its functions from a2blocked.c. 
+
+    At the beginning of our ppmtrans program, the intended A2Method (plain for 
+    A2plain methods and blocked for A2blocked methods) is set using the 
+    SET_METHODS macro. This same macro sets the mapping type (-row, -col, 
+    -block, default), which sets the mapping traversal function to use within 
+    the polymorphic A2Methods. If no mapping type is provided, the map_default 
+    function within the A2Methods is called, which is the best mapping function
+    for that particular form of A2 array. The polymorphic design of the 
+    A2Methods allows our ppmtrans function to call functions that will call the
+    appropriate A2 array functions based on how the data is stored 
+    (plain/blocked). This allows the program to manipulate these 2D arrays 
+    using the same code, calling the same functions with A2Methods.
+
+
+Part E: Measured Performance:
+
+    See attached our performance_data.pdf, which contains a table of our 
+    individual transformation time test data based on major-type. 
+
+    Our original assumption was that the blocked access (UArray2b) would 
+    perform the best because we thought it would have the best hit rate due to 
+    its locality of having cells stored in memory close together and only 
+    having to move those cells within that smaller space (blocks) in memory and
+    then moving the blocks. From our data collection, however, we observed that
+    the block-major transformation performed significantly worse than the 
+    row-major and column-major transformations in all forms of transformations 
+    (rotates, flips, and transposes). 
+
+    To collect our data, we used the timer that started recording at the 
+    beginning of the transformation driver, our program called to execute 
+    transformations, for the corresponding transformation being performed 
+    (rotation, flip, transpose) and ended as soon as the array manipulation was
+    done. Then, the overall time for completion and the calculated time per 
+    pixel (time / (width * height)) was outputted to a file. We performed 3 
+    tests for each transformation type and major type for every tested image 
+    and averaged the times to get a number we could use for comparison. Our 
+    testing data consists of two images of very different image sizes. One 
+    image (from-wind-cave.ppm) was a 816x458 pixel image that could be 
+    transformed in a few seconds. The other image we tested was a much larger 
+    image (mobo.ppm) with dimensions of 8160x6120 pixels. Overall, we found 
+    that the results for each of the transformations and the major-types were 
+    very consistent between the small and large image. The same transformation 
+    on types that were fastest and slowest on one image were the same for the 
+    other image. 
+
+    The data gathered from our from-wind-cave.ppm image was very similar to the
+    result from our mobo.ppm image. From our large mobo.ppm image results, we 
+    gather much clearer results to the smaller image from-wind-cave.ppm. 
+    Overall, we found that the same conclusions we drew from the small image 
+    were proven again by a wider margin in the larger image. Block-major 
+    transformations were still much slower by a large margin except in the 0 
+    degree rotation, which was essentially neglectable in all of the cases due
+    to its small values that were only slightly different between major-types. 
+
+    Starting from our from-wind-cave.ppm image, we found that block-major 
+    transformations were much slower than both row-major and column-major by a
+    significant margin. This results opposes our hypothesis theorized 
+    previously in our design. On average for both sized images, row-major and
+    column-major transformations performed in around 50-80 nanoseconds per 
+    pixel for all transformations (rotations 0, 90, 180, 270, flip horizontal
+    and vertical, and transpose). On the other hand, block-major 
+    transformations performed in about 200-210 nanoseconds per pixel. This is 
+    most likely because the blocked implementation of the array is more 
+    complex, with the data structure of the UArray2b being made out of UArray2
+    of UArrays. This meant that in order to manipulate the UArary2b, first the
+    individual UArray2 needed to be accessed to retrieve the block containing
+    the intended cell to manipulate and then the UArray within needed to be
+    accessed to get to the individual cell containing the cell (pixel struct
+    for a ppm image). This complexity of retrieving UArrays in UArray2s most
+    likely added to the time completely, despite the blocks containing cells
+    close together in memory by being stored in a contiguous UArray. 
+    Additionally, an aspect of our mapping function for UArray2b that could
+    have slowed down these operations is that our function requires many more
+    conditional checks to determine if each element is part of the array. Some
+    arrays are blocked with block sizes that are not exactly divisible by the
+    number of elements in the width or height so there were some unused cells
+    in the array. Our mapping function avoids reading these unused cells that
+    do not contain cells, but this requires our mapping function to perform
+    many checks to ensure that it is stopping before these unused cells. 
+
+    In comparing row-major and column-major performance, row-major 
+    transformations were generally faster than column-major transformations by
+    about 10-50 nanoseconds. This is true for both the small and large images
+    we tested. This is because in row-major order, consecutive elements of a 
+    row are stored adjacently in memory, meaning that elements of the same row
+    are stored next to each other and have high locality. This would allow for 
+    faster read times compared to the column-major order where we are 
+    traversing through elements further apart in memory, which then slows the
+    overall transformation function when using this method. 
+
+    Within the row-major transformation tests, we found that rotations of 90 
+    and 270 degrees and transpose were much slower than 180 degree rotations 
+    and flip horizontal and vertical transformations. This is because the 90 
+    and 270 degree rotation functions deal with the initialization of an 
+    entirely new array of swapped dimensions in order to perform the 
+    transformation. In order to facilitate the manipulation, we need to parse 
+    the indices of the new array in a flipped, column-major order where the 
+    consecutive elements we read and write to are not stored closely in memory.
+    In the case of 180 degree rotation, the dimensions of the new array are the
+    same as the original array, so moved pixels are stored closer in memory and
+    can be performed in a faster time. On the contrary, 90 and 270 degree 
+    transformations, as well as transpose, were the faster transformations for
+    column-major transformations. We hypothesize that, in column-major, 90 and
+    270 degree rotations and transpose transformations are faster because these
+    transformations deal with the initialization of an entirely new array of
+    swapped dimensions. In this case, this fact is advantageous to the speed of
+    the transformations because the reading and writing of the new array will
+    be in a swapped, row-major order. In this parsing, the elements are stored
+    closer together in memory. Contrarily, in the other transformations, we are
+    reading and writing in both column-major order, where the elements are
+    stored further apart in memory.
+ 
+    Between our block-major transformations on both image sizes, we found that 
+    there was a very similar time per pixel across all of the transformation 
+    types. The block-major transformation times for the small image were 
+    typically around 200 nanoseconds for all of the transformations, and the 
+    block-major transformations for the larger image were typically all around
+    280 nanoseconds. This makes sense considering all of the other data that 
+    the time per pixel was generally a bit slower for the larger image, but the
+    fact that the block-major transformation stayed relatively similar between 
+    any of the transformations was significant. We figure that this observation
+    is because regardless of how we are reading and writing to another 
+    UArray2b, the parsing of the blocked array will have the same locality with
+    consecutive integers since they are stored closely together inside a single
+    block. No matter how we transfer over the pixels from one image to another,
+    we are going to have to read through pixels contained in the blocks that 
+    have equal dimensions.
+
+    Considering the fact that the servers execute approximately 1,000,000,000 
+    instructions per seconds, the number of instructions per pixel were 
+    different by about 30-50 nanoseconds per pixel between the small image and 
+    large image. Interestingly, the difference between the time per pixel for 
+    each of the transformations for the small and large image were still 
+    closely proportional, meaning that the differences between the time for 
+    each transformations does not vary much due to the number of pixels in the
+    image, but more because of the operations occurring in each transformation 
+    by major-type.
+
+
+Time spent on the assignment:
+- We spent about 40 hours on this assignment.
